@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+
+# PyInstaller
+build/
+dist/
+*.spec
+*.exe
+
+# User local runtime config
+quick_commands.json
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

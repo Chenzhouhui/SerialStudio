@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SerialStudio · 嵌入式串口调试助手</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg-base: #090d16;
+      --bg-surface: #111827;
+      --bg-elevated: #1a2333;
+      --bg-input: #0b1120;
+      --border: rgba(148, 163, 184, 0.14);
+      --border-focus: #38bdf8;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent: #0ea5e9;
+      --accent-hover: #0284c7;
+      --accent-glow: rgba(14, 165, 233, 0.25);
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --rx-color: #34d399;
+      --tx-color: #38bdf8;
+      --sys-color: #fbbf24;
+      --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      --radius: 10px;
+      --radius-sm: 7px;
+      --font-sans: "Segoe UI Variable", "Microsoft YaHei UI", system-ui, -apple-system, sans-serif;
+      --font-mono: "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+    }
+
+    [data-theme="light"] {
+      color-scheme: light;
+      --bg-base: #f1f5f9;
+      --bg-surface: #ffffff;
+      --bg-elevated: #f8fafc;
+      --bg-input: #f8fafc;
+      --border: rgba(15, 23, 42, 0.1);
+      --border-focus: #0284c7;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --accent: #0284c7;
+      --accent-hover: #0369a1;
+      --accent-glow: rgba(2, 132, 199, 0.18);
+      --rx-color: #059669;
+      --tx-color: #0284c7;
+      --sys-color: #d97706;
+      --shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.45); }
+
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      border: 1px solid var(--border);
+    }
+
+    .topbar {
+      height: 50px;
+      padding: 0 0 0 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .drag-spacer {
+      flex: 1;
+      height: 100%;
+      min-width: 16px;
+    }
+
+    .win-controls {
+      display: flex;
+      align-items: stretch;
+      height: 100%;
+      margin-left: 2px;
+    }
+    .win-sep {
+      width: 1px;
+      height: 18px;
+      background: var(--border);
+      margin: 0 2px;
+    }
+    .win-btn {
+      width: 46px;
+      height: 100%;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.12s, color 0.12s;
+    }
+    .win-btn:hover {
+      background: rgba(148, 163, 184, 0.14);
+      color: var(--text-primary);
+    }
+    .win-btn.close:hover {
+      background: #e11d48;
+      color: #ffffff;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #0ea5e9, #6366f1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(14, 165, 233, 0.35);
+    }
+    .brand-title {
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.2px;
+    }
+    .brand-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-left: 2px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 11px;
+      border-radius: 99px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-left: 8px;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      transition: all 0.2s;
+    }
+    .status-pill.connected {
+      border-color: rgba(16, 185, 129, 0.35);
+      color: var(--success);
+    }
+    .status-pill.connected .status-dot {
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.55; transform: scale(0.85); }
+    }
+
+    .nav-tabs {
+      display: flex;
+      background: var(--bg-base);
+      padding: 3px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      gap: 2px;
+    }
+    .nav-tab {
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      padding: 6px 14px;
+      border-radius: 7px;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .nav-tab:hover { color: var(--text-primary); }
+    .nav-tab.active {
+      background: var(--bg-surface);
+      color: var(--accent);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      height: 100%;
+      gap: 8px;
+    }
+    .counter-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: var(--bg-base);
+      border: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--text-secondary);
+    }
+    .counter-badge b.rx { color: var(--rx-color); }
+    .counter-badge b.tx { color: var(--tx-color); }
+
+    .icon-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .icon-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--accent);
+    }
+
+    .workspace {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      gap: 12px;
+      padding: 12px;
+    }
+
+    .sidebar {
+      width: 288px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      box-shadow: var(--shadow);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .card-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    .field label {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    select, input[type="text"], input[type="number"] {
+      width: 100%;
+      height: 32px;
+      padding: 0 9px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    select:focus, input:focus, textarea:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+    select option {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+    }
+
+    .combo-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .combo-wrap input {
+      padding-right: 30px;
+      font-family: var(--font-mono);
+    }
+    .combo-btn {
+      position: absolute;
+      right: 2px;
+      top: 2px;
+      bottom: 2px;
+      width: 26px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 5px;
+    }
+    .combo-btn:hover { color: var(--text-primary); }
+    .combo-menu {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 4px);
+      max-height: 210px;
+      overflow-y: auto;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow);
+      padding: 4px;
+      z-index: 50;
+      display: none;
+    }
+    .combo-menu.open { display: block; }
+    .combo-item {
+      padding: 6px 9px;
+      border-radius: 5px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: var(--text-primary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .combo-item:hover, .combo-item.active {
+      background: var(--accent-glow);
+      color: var(--accent);
+    }
+
+    .port-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .port-row select { flex: 1; }
+
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 0;
+    }
+    .switch-label {
+      font-size: 12.5px;
+      color: var(--text-primary);
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 34px;
+      height: 19px;
+      flex-shrink: 0;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      transition: 0.2s;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 13px;
+      width: 13px;
+      left: 2px;
+      bottom: 2px;
+      background: var(--text-secondary);
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+    .switch input:checked + .slider {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .switch input:checked + .slider:before {
+      transform: translateX(15px);
+      background: #ffffff;
+    }
+
+    .dtr-rts-row {
+      display: flex;
+      gap: 14px;
+      margin: 8px 0 10px;
+      padding: 6px 10px;
+      background: var(--bg-elevated);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+    .dtr-rts-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .btn {
+      height: 34px;
+      padding: 0 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-primary {
+      background: linear-gradient(135deg, #0ea5e9, #2563eb);
+      border: none;
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 3px 12px rgba(14, 165, 233, 0.3);
+    }
+    .btn-primary:hover {
+      filter: brightness(1.08);
+      color: #fff;
+    }
+    .btn-danger {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      border: none;
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 3px 12px rgba(239, 68, 68, 0.3);
+    }
+    .btn-danger:hover {
+      filter: brightness(1.08);
+      color: #fff;
+    }
+    .btn-full { width: 100%; height: 36px; }
+    .btn-sm { height: 28px; padding: 0 10px; font-size: 12px; }
+    .btn-group { display: flex; gap: 6px; margin-top: 8px; }
+    .btn-group .btn { flex: 1; }
+
+    .main-panel {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .tab-pane {
+      display: none;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+    }
+    .tab-pane.active { display: flex; }
+
+    .pane-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-elevated);
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .search-box {
+      position: relative;
+      width: 220px;
+    }
+    .search-box input {
+      height: 28px;
+      padding-left: 28px;
+      font-size: 12px;
+    }
+    .search-box svg {
+      position: absolute;
+      left: 8px;
+      top: 7px;
+      color: var(--text-muted);
+    }
+
+    .terminal-output {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+      background: var(--bg-input);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.55;
+      user-select: text;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .log-line { display: block; padding: 1px 0; }
+    .log-ts { color: var(--text-muted); margin-right: 8px; font-size: 11.5px; }
+    .log-rx { color: var(--rx-color); }
+    .log-tx { color: var(--tx-color); }
+    .log-sys { color: var(--sys-color); font-style: italic; }
+
+    .composer {
+      display: flex;
+      gap: 10px;
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-surface);
+      flex-shrink: 0;
+    }
+    .composer textarea {
+      flex: 1;
+      height: 68px;
+      resize: none;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      outline: none;
+      line-height: 1.45;
+    }
+    .composer-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 118px;
+    }
+    .composer-actions .btn-primary { flex: 1; }
+
+    .wave-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-surface);
+      min-height: 38px;
+      align-items: center;
+    }
+    .ch-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 9px;
+      border-radius: 99px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .ch-pill.hidden { opacity: 0.38; text-decoration: line-through; }
+    .ch-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    .wave-canvas-wrap {
+      flex: 1;
+      position: relative;
+      background: var(--bg-input);
+      min-height: 0;
+    }
+    #waveCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .cmd-table-wrap {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+    .cmd-row {
+      display: grid;
+      grid-template-columns: 150px 1fr 64px 125px 124px;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+    }
+    .cmd-row.header {
+      background: transparent;
+      border: none;
+      margin-bottom: 2px;
+      padding: 4px 10px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .cmd-row input.mono { font-family: var(--font-mono); }
+
+    .toast {
+      position: fixed;
+      bottom: 18px;
+      right: 20px;
+      padding: 9px 15px;
+      border-radius: 8px;
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      font-size: 12.5px;
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: all 0.2s ease;
+      z-index: 999;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.error { border-color: rgba(239, 68, 68, 0.6); background: #450a0a; }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand pywebview-drag-region">
+      <div class="brand-icon">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+      </div>
+      <div>
+        <span class="brand-title">SerialStudio</span>
+        <span class="brand-sub">嵌入式串口调试助手</span>
+      </div>
+      <div id="statusPill" class="status-pill">
+        <span class="status-dot"></span>
+        <span id="statusText">未连接</span>
+      </div>
+    </div>
+
+    <div class="drag-spacer pywebview-drag-region"></div>
+
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="terminal">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+        收发终端
+      </button>
+      <button class="nav-tab" data-tab="waveform">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h4l3-9 5 18 3-9h5"></path></svg>
+        实时波形
+      </button>
+      <button class="nav-tab" data-tab="commands">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        快捷指令集
+      </button>
+    </nav>
+
+    <div class="drag-spacer pywebview-drag-region"></div>
+
+    <div class="topbar-right">
+      <div class="counter-badge">
+        <span>RX <b class="rx" id="rxCount">0 B</b></span>
+        <span>|</span>
+        <span>TX <b class="tx" id="txCount">0 B</b></span>
+      </div>
+      <button class="icon-btn" id="resetCountersBtn" title="清零收发计数">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+      </button>
+      <button class="icon-btn" id="themeBtn" title="切换深色/浅色主题">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+      </button>
+      <span class="win-sep"></span>
+      <div class="win-controls">
+        <button class="win-btn" id="winMinBtn" title="最小化">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <button class="win-btn" id="winMaxBtn" title="最大化 / 还原">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1.5"></rect></svg>
+        </button>
+        <button class="win-btn close" id="winCloseBtn" title="关闭">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="sidebar">
+      <section class="card">
+        <div class="card-header">
+          <span class="card-title">串口配置</span>
+        </div>
+        <div class="port-row">
+          <select id="portSelect"></select>
+          <button class="icon-btn" id="refreshPortsBtn" title="刷新串口列表">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          </button>
+        </div>
+
+        <div class="field">
+          <label>波特率 (支持自定义输入)</label>
+          <div class="combo-wrap" id="baudCombo">
+            <input type="text" id="baudInput" value="115200" autocomplete="off" />
+            <button type="button" class="combo-btn" id="baudToggleBtn" title="选择常用波特率">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+            <div class="combo-menu" id="baudMenu"></div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label>数据位</label>
+            <select id="databitsSelect">
+              <option value="8" selected>8</option><option value="7">7</option>
+              <option value="6">6</option><option value="5">5</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>校验位</label>
+            <select id="paritySelect">
+              <option value="N" selected>无 (N)</option><option value="E">偶校验 (E)</option>
+              <option value="O">奇校验 (O)</option><option value="M">标记 (M)</option><option value="S">空格 (S)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>停止位</label>
+            <select id="stopbitsSelect">
+              <option value="1" selected>1</option><option value="1.5">1.5</option><option value="2">2</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>硬件流控</label>
+            <select id="flowSelect">
+              <option value="无" selected>无</option><option value="RTS/CTS">RTS/CTS</option><option value="XON/XOFF">XON/XOFF</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="dtr-rts-row">
+          <div class="dtr-rts-item">
+            <span>DTR</span>
+            <label class="switch"><input type="checkbox" id="dtrToggle"><span class="slider"></span></label>
+          </div>
+          <div class="dtr-rts-item">
+            <span>RTS</span>
+            <label class="switch"><input type="checkbox" id="rtsToggle"><span class="slider"></span></label>
+          </div>
+        </div>
+
+        <button id="connectBtn" class="btn btn-primary btn-full">打开串口</button>
+      </section>
+
+      <section class="card">
+        <div class="card-header"><span class="card-title">接收设置</span></div>
+        <div class="switch-row">
+          <span class="switch-label">HEX 十六进制显示</span>
+          <label class="switch"><input type="checkbox" id="rxHexToggle"><span class="slider"></span></label>
+        </div>
+        <div class="switch-row">
+          <span class="switch-label">显示毫秒时间戳</span>
+          <label class="switch"><input type="checkbox" id="rxTsToggle" checked><span class="slider"></span></label>
+        </div>
+        <div class="switch-row">
+          <span class="switch-label">自动换行</span>
+          <label class="switch"><input type="checkbox" id="rxNewlineToggle" checked><span class="slider"></span></label>
+        </div>
+        <div class="switch-row">
+          <span class="switch-label">自动滚屏</span>
+          <label class="switch"><input type="checkbox" id="rxAutoScrollToggle" checked><span class="slider"></span></label>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-sm" id="pauseRxBtn">暂停</button>
+          <button class="btn btn-sm" id="clearRxBtn">清空</button>
+          <button class="btn btn-sm" id="saveLogBtn">导出</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header"><span class="card-title">发送设置</span></div>
+        <div class="switch-row" style="margin-bottom:6px;">
+          <span class="switch-label">HEX 十六进制发送</span>
+          <label class="switch"><input type="checkbox" id="txHexToggle"><span class="slider"></span></label>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label>自动追加校验</label>
+            <select id="txChecksumSelect">
+              <option value="无" selected>无</option>
+              <option value="CRC16-Modbus">CRC16-Modbus</option>
+              <option value="Sum8">Sum8</option>
+              <option value="XOR8">XOR8</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>行尾结束符</label>
+            <select id="txEndingSelect">
+              <option value="CRLF (\r\n)" selected>CRLF (\r\n)</option>
+              <option value="LF (\n)">LF (\n)</option>
+              <option value="CR (\r)">CR (\r)</option>
+              <option value="无">无</option>
+            </select>
+          </div>
+        </div>
+        <div class="switch-row" style="margin-top:4px; gap:8px;">
+          <span class="switch-label">定时发送 (ms)</span>
+          <input type="number" id="autoIntervalInput" value="1000" min="20" style="width:76px; height:27px;" />
+          <label class="switch"><input type="checkbox" id="autoSendToggle"><span class="slider"></span></label>
+        </div>
+      </section>
+    </aside>
+
+    <main class="main-panel">
+      <div id="tab-terminal" class="tab-pane active">
+        <div class="pane-toolbar">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-weight:600; font-size:12.5px;">数据监视终端</span>
+            <span id="rxLineCount" style="font-size:11.5px; color:var(--text-muted);">0 条记录</span>
+          </div>
+          <div class="search-box">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="filterInput" placeholder="过滤关键字..." />
+          </div>
+        </div>
+        <div id="terminalOutput" class="terminal-output"></div>
+        <div class="composer">
+          <textarea id="txInput" placeholder="输入发送内容（Ctrl + Enter 快捷发送，↑ / ↓ 切换历史记录）..."></textarea>
+          <div class="composer-actions">
+            <button id="sendBtn" class="btn btn-primary">发送数据</button>
+            <button id="clearTxBtn" class="btn btn-sm">清空输入</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-waveform" class="tab-pane">
+        <div class="pane-toolbar">
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span style="font-size:12px; color:var(--text-secondary);">解析协议:</span>
+            <select id="waveProtoSelect" style="width:175px; height:28px;">
+              <option value="文本 CSV / FireWater" selected>文本 CSV / FireWater</option>
+              <option value="JustFloat (二进制)">JustFloat (二进制)</option>
+            </select>
+            <label style="display:inline-flex; align-items:center; gap:5px; font-size:12px; cursor:pointer;">
+              <input type="checkbox" id="waveAutoScale" checked /> Y轴自适应
+            </label>
+            <input type="number" id="waveYMin" value="-10" style="width:62px; height:27px;" title="Y 最小值" />
+            <span style="color:var(--text-muted);">~</span>
+            <input type="number" id="waveYMax" value="30" style="width:62px; height:27px;" title="Y 最大值" />
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button id="wavePauseBtn" class="btn btn-sm">暂停波形</button>
+            <button id="waveClearBtn" class="btn btn-sm">清空波形</button>
+          </div>
+        </div>
+        <div id="waveLegend" class="wave-legend">
+          <span style="font-size:12px; color:var(--text-muted);">等待波形数据输入（可选择“模拟串口”立即预览波形）...</span>
+        </div>
+        <div class="wave-canvas-wrap">
+          <canvas id="waveCanvas"></canvas>
+        </div>
+      </div>
+
+      <div id="tab-commands" class="tab-pane">
+        <div class="pane-toolbar">
+          <div style="display:flex; gap:8px;">
+            <button id="addCmdBtn" class="btn btn-primary btn-sm">+ 新增指令</button>
+            <button id="saveCmdBtn" class="btn btn-sm">保存配置</button>
+            <button id="resetCmdBtn" class="btn btn-sm">恢复默认</button>
+          </div>
+          <span style="font-size:11.5px; color:var(--text-muted);">发送时会自动应用左侧的“追加校验”选项</span>
+        </div>
+        <div id="cmdTableWrap" class="cmd-table-wrap"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const CH_COLORS = ["#38bdf8", "#34d399", "#fbbf24", "#f472b6", "#a78bfa", "#fb7185", "#2dd4bf", "#f97316"];
+const MAX_TERM_NODES = 1200;
+const MAX_WAVE_PTS = 300;
+
+let isConnected = false;
+let rxPaused = false;
+let rxTotal = 0;
+let txTotal = 0;
+let rxLines = 0;
+let autoSendTimer = null;
+let txHistory = [];
+let historyIdx = -1;
+let quickCommands = [];
+
+let wavePaused = false;
+let waveChannels = [];
+let waveVisible = [];
+let hoverPos = null;
+
+const $ = (id) => document.getElementById(id);
+
+function showToast(msg, isError = false) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "toast show" + (isError ? " error" : "");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+function fmtBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1048576) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1048576).toFixed(2)} MB`;
+}
+
+function updateCounters() {
+  $("rxCount").textContent = fmtBytes(rxTotal);
+  $("txCount").textContent = fmtBytes(txTotal);
+}
+
+function appendLog(text, type, tsStr = "") {
+  const filter = $("filterInput").value.trim().toLowerCase();
+  const out = $("terminalOutput");
+  const span = document.createElement("span");
+  span.className = "log-line";
+  span.dataset.raw = (tsStr + " " + text).toLowerCase();
+  if (filter && !span.dataset.raw.includes(filter)) {
+    span.style.display = "none";
+  }
+
+  if (tsStr && $("rxTsToggle").checked) {
+    const tsEl = document.createElement("span");
+    tsEl.className = "log-ts";
+    tsEl.textContent = `[${tsStr}]`;
+    span.appendChild(tsEl);
+  }
+  const bodyEl = document.createElement("span");
+  bodyEl.className = `log-${type}`;
+  bodyEl.textContent = text;
+  span.appendChild(bodyEl);
+  out.appendChild(span);
+
+  rxLines++;
+  while (out.childNodes.length > MAX_TERM_NODES) {
+    out.removeChild(out.firstChild);
+  }
+  $("rxLineCount").textContent = `${out.childNodes.length} 条记录`;
+  if ($("rxAutoScrollToggle").checked) {
+    out.scrollTop = out.scrollHeight;
+  }
+}
+
+function applyFilter() {
+  const q = $("filterInput").value.trim().toLowerCase();
+  for (const node of $("terminalOutput").children) {
+    node.style.display = !q || (node.dataset.raw || "").includes(q) ? "" : "none";
+  }
+}
+
+async function refreshPorts() {
+  try {
+    const ports = await window.pywebview.api.list_ports();
+    const sel = $("portSelect");
+    const prev = sel.value;
+    sel.innerHTML = "";
+    ports.forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = p.device;
+      opt.textContent = p.display_name;
+      sel.appendChild(opt);
+    });
+    if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+  } catch (e) {
+    showToast("刷新串口失败: " + e, true);
+  }
+}
+
+async function toggleConnection() {
+  if (isConnected) {
+    stopAutoSend();
+    await window.pywebview.api.close_port();
+    isConnected = false;
+    $("connectBtn").textContent = "打开串口";
+    $("connectBtn").className = "btn btn-primary btn-full";
+    $("statusPill").classList.remove("connected");
+    $("statusText").textContent = "未连接";
+    appendLog("[系统] 串口已关闭", "sys");
+    return;
+  }
+
+  const cfg = {
+    port: $("portSelect").value,
+    baudrate: parseInt($("baudInput").value, 10) || 115200,
+    bytesize: parseInt($("databitsSelect").value, 10),
+    parity: $("paritySelect").value,
+    stopbits: parseFloat($("stopbitsSelect").value),
+    flow_control: $("flowSelect").value,
+    dtr: $("dtrToggle").checked,
+    rts: $("rtsToggle").checked,
+  };
+  const res = await window.pywebview.api.open_port(cfg);
+  if (!res.ok) {
+    showToast("打开串口失败: " + res.error, true);
+    return;
+  }
+  isConnected = true;
+  $("connectBtn").textContent = "关闭串口";
+  $("connectBtn").className = "btn btn-danger btn-full";
+  $("statusPill").classList.add("connected");
+  $("statusText").textContent = res.label;
+  appendLog(`[系统] 已打开 ${res.label}`, "sys");
+}
+
+async function sendPayload(rawText, useHex, ending) {
+  if (!isConnected) {
+    showToast("请先打开串口", true);
+    stopAutoSend();
+    return;
+  }
+  const checksum = $("txChecksumSelect").value;
+  const res = await window.pywebview.api.send_data(rawText, useHex, ending, checksum);
+  if (!res.ok) {
+    showToast("发送失败: " + res.error, true);
+    stopAutoSend();
+    return;
+  }
+  if (res.sent_bytes > 0) {
+    txTotal += res.sent_bytes;
+    updateCounters();
+    appendLog(`TX >> ${res.display_text}`, "tx", res.ts);
+  }
+}
+
+function sendCurrentInput() {
+  const txt = $("txInput").value;
+  if (!txt) return;
+  if (txHistory[txHistory.length - 1] !== txt) txHistory.push(txt);
+  historyIdx = txHistory.length;
+  sendPayload(txt, $("txHexToggle").checked, $("txEndingSelect").value);
+}
+
+function stopAutoSend() {
+  $("autoSendToggle").checked = false;
+  if (autoSendTimer) { clearInterval(autoSendTimer); autoSendTimer = null; }
+}
+
+function pushWaveSample(vals) {
+  if (wavePaused || !vals || !vals.length) return;
+  const count = Math.min(vals.length, CH_COLORS.length);
+  let needLegend = false;
+  while (waveChannels.length < count) {
+    waveChannels.push([]);
+    waveVisible.push(true);
+    needLegend = true;
+  }
+  for (let i = 0; i < count; i++) {
+    waveChannels[i].push(vals[i]);
+    if (waveChannels[i].length > MAX_WAVE_PTS) waveChannels[i].shift();
+  }
+  if (needLegend) renderLegend();
+  else updateLegendValues();
+  drawWaveform();
+}
+
+function renderLegend() {
+  const box = $("waveLegend");
+  box.innerHTML = "";
+  if (!waveChannels.length) {
+    box.innerHTML = '<span style="font-size:12px; color:var(--text-muted);">等待波形数据输入（可选择“模拟串口”立即预览波形）...</span>';
+    return;
+  }
+  waveChannels.forEach((ch, idx) => {
+    const pill = document.createElement("div");
+    pill.className = "ch-pill" + (waveVisible[idx] ? "" : " hidden");
+    const last = ch.length ? ch[ch.length - 1].toFixed(2) : "--";
+    pill.innerHTML = `<span class="ch-dot" style="background:${CH_COLORS[idx]}"></span><span>CH${idx}: <b id="chVal${idx}">${last}</b></span>`;
+    pill.onclick = () => {
+      waveVisible[idx] = !waveVisible[idx];
+      pill.classList.toggle("hidden", !waveVisible[idx]);
+      drawWaveform();
+    };
+    box.appendChild(pill);
+  });
+}
+
+function updateLegendValues() {
+  waveChannels.forEach((ch, idx) => {
+    const el = $(`chVal${idx}`);
+    if (el && ch.length) el.textContent = ch[ch.length - 1].toFixed(2);
+  });
+}
+
+function drawWaveform() {
+  const canvas = $("waveCanvas");
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width < 20 || rect.height < 20) return;
+  const dpr = window.devicePixelRatio || 1;
+  if (canvas.width !== Math.round(rect.width * dpr) || canvas.height !== Math.round(rect.height * dpr)) {
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+  }
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const w = rect.width, h = rect.height;
+  const isLight = document.documentElement.getAttribute("data-theme") === "light";
+  ctx.clearRect(0, 0, w, h);
+
+  const padL = 56, padR = 18, padT = 18, padB = 26;
+  const pw = Math.max(1, w - padL - padR);
+  const ph = Math.max(1, h - padT - padB);
+
+  let yMin = parseFloat($("waveYMin").value) || -10;
+  let yMax = parseFloat($("waveYMax").value) || 30;
+  if ($("waveAutoScale").checked) {
+    let lo = Infinity, hi = -Infinity;
+    waveChannels.forEach((ch, i) => {
+      if (!waveVisible[i]) return;
+      for (const v of ch) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    });
+    if (lo < Infinity) {
+      const span = hi - lo;
+      const m = span > 1e-6 ? span * 0.12 : 1.0;
+      yMin = lo - m; yMax = hi + m;
+    }
+  }
+  if (yMax <= yMin) yMax = yMin + 1;
+
+  ctx.strokeStyle = isLight ? "rgba(15,23,42,0.08)" : "rgba(148,163,184,0.12)";
+  ctx.fillStyle = isLight ? "#64748b" : "#94a3b8";
+  ctx.font = "11px Consolas, monospace";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  ctx.setLineDash([3, 3]);
+
+  for (let i = 0; i <= 4; i++) {
+    const f = i / 4;
+    const y = padT + f * ph;
+    const val = yMax - f * (yMax - yMin);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+    ctx.fillText(val.toFixed(2), padL - 8, y);
+  }
+  for (let i = 0; i <= 6; i++) {
+    const x = padL + (i / 6) * pw;
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, h - padB); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.strokeStyle = isLight ? "rgba(15,23,42,0.18)" : "rgba(148,163,184,0.25)";
+  ctx.strokeRect(padL, padT, pw, ph);
+
+  waveChannels.forEach((ch, idx) => {
+    if (!waveVisible[idx] || ch.length < 2) return;
+    ctx.strokeStyle = CH_COLORS[idx];
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const offset = MAX_WAVE_PTS - ch.length;
+    for (let j = 0; j < ch.length; j++) {
+      const x = padL + ((offset + j) / (MAX_WAVE_PTS - 1)) * pw;
+      const ny = (ch[j] - yMin) / (yMax - yMin);
+      const y = Math.max(padT, Math.min(h - padB, padT + (1 - ny) * ph));
+      if (j === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  });
+
+  if (hoverPos && hoverPos.x >= padL && hoverPos.x <= w - padR && hoverPos.y >= padT && hoverPos.y <= h - padB) {
+    ctx.strokeStyle = isLight ? "rgba(2,132,199,0.45)" : "rgba(56,189,248,0.45)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(hoverPos.x, padT); ctx.lineTo(hoverPos.x, h - padB);
+    ctx.moveTo(padL, hoverPos.y); ctx.lineTo(w - padR, hoverPos.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const valY = yMax - ((hoverPos.y - padT) / ph) * (yMax - yMin);
+    ctx.fillStyle = "#0ea5e9";
+    ctx.textAlign = "left";
+    ctx.fillText(`Y = ${valY.toFixed(2)}`, hoverPos.x + 8, hoverPos.y - 10);
+  }
+}
+
+function renderQuickCommands() {
+  const wrap = $("cmdTableWrap");
+  wrap.innerHTML = `
+    <div class="cmd-row header">
+      <span>名称</span><span>指令内容</span><span>HEX</span><span>行尾结束符</span><span>操作</span>
+    </div>`;
+  quickCommands.forEach((cmd, idx) => {
+    const row = document.createElement("div");
+    row.className = "cmd-row";
+    row.innerHTML = `
+      <input type="text" value="${escapeHtml(cmd.name || '')}" data-k="name" />
+      <input type="text" class="mono" value="${escapeHtml(cmd.payload || '')}" data-k="payload" />
+      <label class="switch"><input type="checkbox" ${cmd.hex ? "checked" : ""} data-k="hex"><span class="slider"></span></label>
+      <select data-k="ending">
+        <option value="CRLF (\\r\\n)" ${cmd.ending === "CRLF (\\r\\n)" ? "selected" : ""}>CRLF (\\r\\n)</option>
+        <option value="LF (\\n)" ${cmd.ending === "LF (\\n)" ? "selected" : ""}>LF (\\n)</option>
+        <option value="CR (\\r)" ${cmd.ending === "CR (\\r)" ? "selected" : ""}>CR (\\r)</option>
+        <option value="无" ${cmd.ending === "无" ? "selected" : ""}>无</option>
+      </select>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-primary btn-sm" data-act="send">发送</button>
+        <button class="btn btn-sm" data-act="del">删除</button>
+      </div>`;
+
+    row.querySelector('[data-k="name"]').oninput = (e) => cmd.name = e.target.value;
+    row.querySelector('[data-k="payload"]').oninput = (e) => cmd.payload = e.target.value;
+    row.querySelector('[data-k="hex"]').onchange = (e) => cmd.hex = e.target.checked;
+    row.querySelector('[data-k="ending"]').onchange = (e) => cmd.ending = e.target.value;
+    row.querySelector('[data-act="send"]').onclick = () => sendPayload(cmd.payload, cmd.hex, cmd.ending);
+    row.querySelector('[data-act="del"]').onclick = () => { quickCommands.splice(idx, 1); renderQuickCommands(); };
+    wrap.appendChild(row);
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+async function pollLoop() {
+  if (isConnected && window.pywebview && window.pywebview.api) {
+    try {
+      const res = await window.pywebview.api.poll_rx(
+        $("rxHexToggle").checked,
+        $("rxNewlineToggle").checked,
+        $("waveProtoSelect").value
+      );
+      if (res.rx_bytes_delta > 0) {
+        rxTotal += res.rx_bytes_delta;
+        updateCounters();
+      }
+      if (!rxPaused && res.entries && res.entries.length) {
+        for (const e of res.entries) appendLog(e.text, "rx", e.ts);
+      }
+      if (res.waves && res.waves.length) {
+        for (const w of res.waves) pushWaveSample(w);
+      }
+    } catch (_) {}
+    setTimeout(pollLoop, 40);
+  } else {
+    setTimeout(pollLoop, 150);
+  }
+}
+
+const MAX_ICON_SVG = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1.5"></rect></svg>';
+const RESTORE_ICON_SVG = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="13" height="13" rx="1.5"></rect><path d="M7 7V4.5A1.5 1.5 0 0 1 8.5 3H19.5A1.5 1.5 0 0 1 21 4.5V15.5A1.5 1.5 0 0 1 19.5 17H16"></path></svg>';
+
+async function toggleWinMaximize() {
+  const res = await window.pywebview.api.win_toggle_maximize();
+  $("winMaxBtn").innerHTML = res && res.maximized ? RESTORE_ICON_SVG : MAX_ICON_SVG;
+}
+
+function initUI() {
+  $("winMinBtn").onclick = () => window.pywebview.api.win_minimize();
+  $("winMaxBtn").onclick = toggleWinMaximize;
+  $("winCloseBtn").onclick = () => window.pywebview.api.win_close();
+  document.querySelectorAll(".pywebview-drag-region").forEach(el => {
+    el.addEventListener("dblclick", toggleWinMaximize);
+  });
+  document.querySelectorAll(".nav-tab").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll(".nav-tab").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      $("tab-" + btn.dataset.tab).classList.add("active");
+      if (btn.dataset.tab === "waveform") setTimeout(drawWaveform, 30);
+    };
+  });
+
+  $("themeBtn").onclick = () => {
+    const cur = document.documentElement.getAttribute("data-theme");
+    document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+    drawWaveform();
+  };
+
+  $("refreshPortsBtn").onclick = refreshPorts;
+  $("connectBtn").onclick = toggleConnection;
+  initBaudCombo();
+  $("dtrToggle").onchange = (e) => window.pywebview.api.set_dtr(e.target.checked);
+  $("rtsToggle").onchange = (e) => window.pywebview.api.set_rts(e.target.checked);
+
+  $("pauseRxBtn").onclick = () => {
+    rxPaused = !rxPaused;
+    $("pauseRxBtn").textContent = rxPaused ? "继续" : "暂停";
+  };
+  $("clearRxBtn").onclick = () => {
+    $("terminalOutput").innerHTML = "";
+    $("rxLineCount").textContent = "0 条记录";
+  };
+  $("saveLogBtn").onclick = async () => {
+    const text = $("terminalOutput").innerText;
+    const res = await window.pywebview.api.save_log(text);
+    if (res.ok && res.path) showToast("日志已导出: " + res.path);
+  };
+  $("resetCountersBtn").onclick = () => { rxTotal = 0; txTotal = 0; updateCounters(); };
+
+  $("filterInput").oninput = applyFilter;
+  $("sendBtn").onclick = sendCurrentInput;
+  $("clearTxBtn").onclick = () => { $("txInput").value = ""; };
+  $("txInput").addEventListener("keydown", (e) => {
+    if (e.ctrlKey && e.key === "Enter") { e.preventDefault(); sendCurrentInput(); }
+    else if (e.key === "ArrowUp" && $("txInput").selectionStart === 0 && txHistory.length) {
+      e.preventDefault();
+      historyIdx = Math.max(0, historyIdx - 1);
+      $("txInput").value = txHistory[historyIdx];
+    } else if (e.key === "ArrowDown" && txHistory.length) {
+      e.preventDefault();
+      historyIdx = Math.min(txHistory.length, historyIdx + 1);
+      $("txInput").value = historyIdx < txHistory.length ? txHistory[historyIdx] : "";
+    }
+  });
+
+  $("autoSendToggle").onchange = (e) => {
+    if (e.target.checked) {
+      if (!isConnected) { e.target.checked = false; showToast("请先打开串口再开启定时发送", true); return; }
+      const ms = Math.max(20, parseInt($("autoIntervalInput").value, 10) || 1000);
+      $("autoIntervalInput").value = ms;
+      sendCurrentInput();
+      autoSendTimer = setInterval(sendCurrentInput, ms);
+    } else {
+      stopAutoSend();
+    }
+  };
+
+  $("wavePauseBtn").onclick = () => {
+    wavePaused = !wavePaused;
+    $("wavePauseBtn").textContent = wavePaused ? "继续波形" : "暂停波形";
+  };
+  $("waveClearBtn").onclick = () => {
+    waveChannels = []; waveVisible = [];
+    renderLegend(); drawWaveform();
+  };
+  $("waveAutoScale").onchange = drawWaveform;
+  $("waveYMin").oninput = drawWaveform;
+  $("waveYMax").oninput = drawWaveform;
+  window.addEventListener("resize", drawWaveform);
+
+  const canvas = $("waveCanvas");
+  canvas.addEventListener("mousemove", (e) => {
+    const r = canvas.getBoundingClientRect();
+    hoverPos = { x: e.clientX - r.left, y: e.clientY - r.top };
+    drawWaveform();
+  });
+  canvas.addEventListener("mouseleave", () => { hoverPos = null; drawWaveform(); });
+
+  $("addCmdBtn").onclick = () => {
+    quickCommands.push({ name: "新指令", payload: "", hex: false, ending: "CRLF (\\r\\n)" });
+    renderQuickCommands();
+  };
+  $("saveCmdBtn").onclick = async () => {
+    const res = await window.pywebview.api.save_quick_commands(quickCommands);
+    if (res.ok) showToast("快捷指令集已保存");
+  };
+  $("resetCmdBtn").onclick = async () => {
+    quickCommands = await window.pywebview.api.reset_quick_commands();
+    renderQuickCommands();
+    showToast("已恢复默认快捷指令");
+  };
+}
+
+function initBaudCombo() {
+  const BAUD_RATES = ["9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600", "1500000", "2000000"];
+  const input = $("baudInput");
+  const menu = $("baudMenu");
+  const wrap = $("baudCombo");
+  const btn = $("baudToggleBtn");
+
+  function renderMenu(filterText = "") {
+    menu.innerHTML = "";
+    const cur = input.value.trim();
+    const list = filterText ? BAUD_RATES.filter(b => b.includes(filterText)) : BAUD_RATES;
+    const items = list.length ? list : BAUD_RATES;
+    items.forEach(rate => {
+      const div = document.createElement("div");
+      div.className = "combo-item" + (rate === cur ? " active" : "");
+      div.textContent = rate;
+      div.onmousedown = (e) => {
+        e.preventDefault();
+        input.value = rate;
+        menu.classList.remove("open");
+      };
+      menu.appendChild(div);
+    });
+  }
+
+  function openMenu(filterText = "") {
+    renderMenu(filterText);
+    menu.classList.add("open");
+  }
+
+  input.addEventListener("focus", () => openMenu(""));
+  input.addEventListener("click", () => openMenu(""));
+  input.addEventListener("input", () => openMenu(input.value.trim()));
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" || e.key === "Enter") menu.classList.remove("open");
+  });
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (menu.classList.contains("open")) menu.classList.remove("open");
+    else { input.focus(); openMenu(""); }
+  });
+  document.addEventListener("click", (e) => {
+    if (!wrap.contains(e.target)) menu.classList.remove("open");
+  });
+}
+
+window.addEventListener("pywebviewready", async () => {
+  initUI();
+  await refreshPorts();
+  quickCommands = await window.pywebview.api.load_quick_commands();
+  renderQuickCommands();
+  pollLoop();
+});
+</script>
+</body>
+</html>
